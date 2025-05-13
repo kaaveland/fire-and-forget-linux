@@ -1,0 +1,143 @@
+---
+- name: Set up bq credentials
+  copy:
+    dest: "/home/{{ user }}/bq_credentials"
+    mode: "0600"
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    content: "{{ bq_service_account }}"
+
+- name: Set up kollektivkart.conf
+  template:
+    dest: "/home/{{ user }}/kollektivkart.conf"
+    src: kollektivkart.conf.j2
+    mode: "0600"
+    owner: "{{ user }}"
+    group: "{{ user }}"
+
+- name: Set up kollektivkart quadlet
+  copy:
+    dest: "/home/{{ user }}/.config/containers/systemd/kollektivkart@.container"
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    mode: "0600"
+    content: |
+      [Unit]
+      Description=Kollektivkart API container on port %i
+      After=network.target
+
+      [Container]
+      Image=ghcr.io/kaaveland/bus-eta:latest
+      PublishPort=127.0.0.1:%i:8000
+      Entrypoint=/app/.venv/bin/gunicorn
+      Exec=kollektivkart.webapp:server --preload --bind 0.0.0.0:8000 --chdir=/app --workers=3
+      AutoUpdate=registry
+      EnvironmentFile=/home/{{ user }}/kollektivkart.conf
+
+      [Service]
+      SyslogIdentifier=kollektivkart
+      Restart=on-failure
+      CPUQuota=200%
+      MemoryMax=3G
+
+- name: Set up kollektivkart start on boot
+  copy:
+    dest: "/home/{{ user }}/.config/systemd/user/kollektivkart-starter.service"
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    mode: "0600"
+    content: |
+      [Unit]
+      Description=Start Kollektivkart Application Instances (8000 and 8001)
+      After=network.target
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/usr/bin/systemctl --user start kollektivkart@8000
+      ExecStart=/usr/bin/systemctl --user start kollektivkart@8001
+      [Install]
+      WantedBy=default.target
+
+- name: Configure reverse proxy
+  template:
+    dest: "/etc/caddy/proxies.d/kollektivkart.caddy"
+    src: kollektivkart.caddy.j2
+    owner: root
+    mode: "0644"
+  notify: reload caddy
+
+- name: Set up rolling-restart script
+  copy:
+    dest: "/home/{{ user }}/rolling-restart"
+    src: "rolling-restart"
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    mode: "0744"
+
+- name: Set up kollektivkart etl quadlet
+  copy:
+    dest: "/home/{{ user }}/.config/containers/systemd/kollektivkart-etl.container"
+    owner: kollektivkart
+    mode: "0600"
+    content: |
+      [Unit]
+      Description=Kollektivkart ETL container
+      After=network.target
+
+      [Container]
+      Image=ghcr.io/kaaveland/bus-eta:latest
+      Volume=/home/{{ user }}/bq_credentials:/bq_credentials:ro
+      Environment=GOOGLE_APPLICATION_CREDENTIALS=/bq_credentials
+      Entrypoint=/app/.venv/bin/python
+      Exec=-m kollektivkart.etl ${PARQUET_LOCATION} --memory-limit-gb 3 --max-cpus 2
+      AutoUpdate=registry
+      EnvironmentFile=/home/{{ user }}/kollektivkart.conf
+
+      [Service]
+      Type=oneshot
+      # This critical line lets systemd find the ${PARQUET_LOCATION} env var from this file
+      # so we can pass it on the command line in the block above
+      EnvironmentFile=/home/{{ user }}/kollektivkart.conf      
+      SyslogIdentifier=kollektivkart-etl
+      CPUQuota=200%
+      MemoryMax=4G
+      WorkingDirectory=/home/{{ user }}
+      ExecStartPost=/home/{{ user }}/rolling-restart
+      
+      [Install]
+      WantedBy=default.target
+
+- name: Set up kollektivkart etl nightly timer
+  copy:
+    dest: "/home/{{ user }}/.config/systemd/user/kollektivkart-etl.timer"
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    mode: "0600"
+    content: |
+      [Unit]
+      Description=Run Kollektivkart ETL nightly
+      RefuseManualStart=false
+      RefuseManualStop=false
+      [Timer]
+      OnCalendar=*-*-* 04:00:00
+      RandomizedDelaySec=30m
+      Persistent=true
+      Unit=kollektivkart-etl.service
+      
+      [Install]
+      WantedBy=timers.target
+
+- name: Reload systemd
+  command: machinectl shell {{ user }}@ /bin/systemctl --user daemon-reload
+
+- name: Enable kollektivkart
+  command: machinectl shell {{ user }}@ /bin/systemctl --user enable kollektivkart-starter
+
+- name: Start kollektivkart
+  command: machinectl shell {{ user }}@ /bin/systemctl --user start kollektivkart-starter
+
+- name: Enable kollektivkart-etl
+  command: machinectl shell {{ user }}@ /bin/systemctl --user enable kollektivkart-etl.timer
+
+- name: Start kollektivkart-etl timer
+  command: machinectl shell {{ user }}@ /bin/systemctl --user start kollektivkart-etl.timer

@@ -1,0 +1,143 @@
+---
+- name: Upgrade apt packages
+  apt:
+    update_cache: yes
+    upgrade: yes
+- name: Ensure base packages
+  apt:
+    name:
+      - vim
+      - curl
+      - git
+      - unattended-upgrades
+      - btop
+      - iotop
+      - nethogs
+      - emacs-nox
+      - strace
+      - gnupg
+      - lsb-release
+      - systemd-container
+      - nmap
+      - fail2ban
+      - ufw
+    state:
+      present
+
+- name: Set hostname to inventory hostname
+  hostname:
+    name: "{{ inventory_hostname }}"
+
+- name: Set timezone to Europe/Oslo
+  community.general.timezone:
+    name: Europe/Oslo
+
+- name: Enable unattended upgrades
+  service:
+    name: unattended-upgrades
+    enabled: yes
+  notify: Reload unattended-upgrades
+
+- name: Configure unattended-upgrades
+  copy:
+    dest: /etc/apt/apt.conf.d/99unattended-upgrades-custom
+    content: |
+      Unattended-Upgrade::Automatic-Reboot "true";
+      Unattended-Upgrade::Automatic-Reboot-WithUsers "true";
+      Unattended-Upgrade::Automatic-Reboot-Time "02:00";
+      Unattended-Upgrade::SyslogEnable "true";
+  notify: Reload unattended-upgrades
+
+- name: Create admin
+  user:
+    name: admin
+    state: present
+    shell: /bin/bash
+    createhome: yes
+    groups: sudo
+    append: yes
+
+- name: Allow passwordless sudo for admin
+  copy:
+    dest: /etc/sudoers.d/admin
+    content: "admin ALL=(ALL) NOPASSWD:ALL"
+    mode: "0440"
+
+- name: Configure authorized_keys for admin
+  with_items: "{{ authorized_keys }}"
+  authorized_key:
+    user: admin
+    key: "{{ item }}"
+    state: present
+
+- name: Require key for ssh-login
+  copy:
+    dest: /etc/ssh/sshd_config.d/harden.conf
+    content: |
+      PermitEmptyPasswords no
+      LoginGraceTime 30s
+      PasswordAuthentication no
+      MaxAuthTries 3
+      MaxSessions 3
+      PermitRootLogin no
+  notify: Reload sshd
+
+- name: Create Fail2Ban jail.local configuration
+  copy:
+    dest: /etc/fail2ban/jail.local
+    content: |
+      [DEFAULT]
+      bantime = 1h
+      # An IP is banned if it has generated "maxretry" during the last "findtime"
+      findtime = 10m
+      maxretry = 5
+
+      [sshd]
+      enabled = true
+      port = ssh
+      maxretry = 3
+      bantime = 24h
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart fail2ban
+
+- name: Enable fail2ban
+  service:
+    name: fail2ban
+    enabled: yes
+
+- name: Set UFW default policies
+  community.general.ufw:
+    default: deny
+    direction: incoming
+
+- name: Set UFW default outgoing policy
+  community.general.ufw:
+    default: allow
+    direction: outgoing
+
+- name: Allow SSH on port 22/tcp (standard port)
+  community.general.ufw:
+    rule: allow
+    port: '22'
+    proto: tcp
+    comment: 'Allow SSH access'
+
+- name: Allow HTTP on port 80/tcp (standard port)
+  community.general.ufw:
+    rule: allow
+    port: '80'
+    proto: tcp
+    comment: 'Allow HTTP access'
+
+- name: Allow HTTPS on port 443/tcp (standard port)
+  community.general.ufw:
+    rule: allow
+    port: '443'
+    proto: tcp
+    comment: 'Allow HTTPS access'
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled

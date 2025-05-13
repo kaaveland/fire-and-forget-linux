@@ -1,0 +1,9 @@
+Types: deb
+{% if ansible_architecture == 'aarch64' or ansible_architecture == 'arm64' %}
+URIs: http://ports.ubuntu.com/ubuntu-ports
+{% else %}
+URIs: http://archive.ubuntu.com/ubuntu
+{% endif %}
+Suites: plucky plucky-updates
+Components: main universe restricted
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg

@@ -1,0 +1,26 @@
+---
+- name: Set up eugene quadlet unit
+  copy:
+    dest: "/home/{{ user }}/.config/containers/systemd/eugene.container"
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    mode: "0600"
+    src: eugene.container
+
+- name: Reload systemd
+  command: machinectl shell {{ user }}@ /bin/systemctl --user daemon-reload
+
+- name: Enable eugene
+  command: machinectl shell {{ user }}@ /bin/systemctl --user enable eugene
+
+- name: Start eugene
+  command: machinectl shell {{ user }}@ /bin/systemctl --user start eugene
+
+- name: Configure reverse proxy
+  template:
+    dest: "/etc/caddy/proxies.d/eugene.caddy"
+    src: eugene.caddy.j2
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload caddy

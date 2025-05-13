@@ -1,0 +1,33 @@
+---
+- name: "Create {{ user }}"
+  user:
+    name: "{{ user }}"
+    state: present
+    shell: /bin/bash
+    createhome: yes
+- name: "Enable linger for {{ user }}"
+  command: loginctl enable-linger {{ user }}
+- name: "Configure authorized keys for {{ user }}"
+  with_items: "{{ authorized_keys }}"
+  authorized_key:
+    user: "{{ user }}"
+    key: "{{ item }}"
+    state: present
+- name: "Create quadlet home for {{ user }}"
+  file:
+    path: "/home/{{ user }}/.config/containers/systemd"
+    state: directory
+    mode: "0700"
+    owner: "{{ user }}"
+- name: "Create systemd units home for {{ user }}"
+  file:
+    path: "/home/{{ user }}/.config/systemd/user"
+    state: directory
+    mode: "0700"
+    owner: "{{ user }}"
+- name: "Create systemd wants home for {{ user }}"
+  file:
+    path: "/home/{{ user }}/.config/systemd/user/default.target.wants"
+    state: directory
+    owner: "{{ user }}"
+    mode: "0700"

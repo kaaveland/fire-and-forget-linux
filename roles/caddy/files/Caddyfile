@@ -1,0 +1,13 @@
+{
+	email robin@example.com
+	servers {
+		timeouts {
+			read_body 5s
+			read_header 5s
+			write 5s
+			idle 3m
+		}
+	}
+}
+
+import /etc/caddy/proxies.d/*

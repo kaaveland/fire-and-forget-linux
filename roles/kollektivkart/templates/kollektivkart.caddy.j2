@@ -1,0 +1,11 @@
+kollektivkart{{ env_suffix }}.kaveland.no {
+    encode
+    reverse_proxy {
+       to localhost:8000 localhost:8001
+       health_uri /ready
+       health_interval 2s
+       health_timeout 1s
+       health_status 200
+    }
+    log
+}

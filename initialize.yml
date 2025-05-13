@@ -1,0 +1,11 @@
+---
+- name: Initialize Ubuntu host
+  hosts: all
+  become: true
+  vars:
+    authorized_keys: # This is my pubkey, you want to replace it. Maybe put it in `vars.yml`?
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE9K1p8B8FRCWJ0Ax4obDu+UsLzGgXDIdTYkCZ8FF54b
+  roles:
+    - name: base-install
+    - name: podman
+    - name: caddy

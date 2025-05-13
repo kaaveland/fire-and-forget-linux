@@ -1,0 +1,21 @@
+---
+- name: Install caddy
+  apt:
+    state: latest
+    update_cache: true
+    name: caddy
+
+- name: Ensure proxies.d
+  file:
+    dest: /etc/caddy/proxies.d/
+    state: directory
+
+- name: Set up global caddyfile
+  copy:
+    dest: /etc/caddy/Caddyfile
+    src: Caddyfile
+
+- name: Enable caddy
+  systemd:
+    name: caddy
+    enabled: yes

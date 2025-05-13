@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+set -euf -o pipefail
+
+echo "Perform rolling-restart of kollektivkart@8000 and kollektivkart@8001"
+
+for port in 8000 8001; do
+  systemctl --user restart kollektivkart@$port
+  for attempt in $(seq 1 20); do
+    sleep 3;
+    if curl -s -o /dev/null -w "" -f http://localhost:$port/ready; then
+      break;
+    else
+      echo "kollektivkart@$port Not up after attempt number $attempt, sleeping"
+    fi
+    if [ "$attempt" -eq 20 ] && ! curl -s -o /dev/null -w "" -f http://localhost:$port/ready; then
+      echo "kollektivkart@$port failed to start after 20 attempts"
+      exit 1
+    fi
+  done
+done

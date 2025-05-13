@@ -1,0 +1,7 @@
+api{{ env_suffix }}.kaveland.no {
+    encode
+    handle /eugene/app/* {
+        reverse_proxy localhost:3000
+    }
+    log
+}

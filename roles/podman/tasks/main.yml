@@ -1,0 +1,28 @@
+---
+- name: Prefer plucky for podman
+  copy:
+    dest: /etc/apt/preferences.d/podman-plucky.pref
+    content: |
+      Package: podman buildah golang-github-containers-common crun libgpgme11t64 libgpg-error0 golang-github-containers-image catatonit conmon containers-storage
+      Pin: release n=plucky
+      Pin-Priority: 991
+
+      Package: libsubid4 netavark passt aardvark-dns containernetworking-plugins libslirp0 slirp4netns
+      Pin: release n=plucky
+      Pin-Priority: 991
+
+      Package: *
+      Pin: release n=plucky
+      Pin-Priority: 400
+
+- name: Add plucky as a source
+  template:
+    dest: /etc/apt/sources.list.d/plucky.sources
+    src: plucky.sources.j2
+
+- name: Install podman
+  apt:
+    update_cache: true
+    name:
+      - podman
+    state: present

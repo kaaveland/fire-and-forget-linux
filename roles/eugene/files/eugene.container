@@ -1,0 +1,16 @@
+[Unit]
+Description=Eugene API for SQL migration validation
+After=network.target
+
+[Container]
+Image=ghcr.io/kaaveland/eugene-web:latest
+PublishPort=127.0.0.1:3000:3000
+StopSignal=SIGKILL
+AutoUpdate=registry
+
+[Service]
+SyslogIdentifier=eugene-web
+CPUQuota=100%
+MemoryMax=128M
+[Install]
+WantedBy=default.target
