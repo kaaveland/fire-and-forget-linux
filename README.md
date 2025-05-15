@@ -64,7 +64,7 @@ Forward Caddy to your localhost interface, so you can interact with it:
 vagrant ssh -L8443:localhost:443
 ```
 
-Note that caddy is going to have a card time making certificates inside the Vagrant box. You can [use the tls directivy](https://caddyserver.com/docs/caddyfile/directives/tls) to have it fake a certificate instead.
+Note that caddy is going to have a card time making certificates inside the Vagrant box. You can [use the tls directive](https://caddyserver.com/docs/caddyfile/directives/tls) to have it fake a certificate instead.
 
 ## Contributions
 
